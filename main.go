@@ -1,14 +1,17 @@
-// package main tells Go to build an executable, like a C++ program with main().
 package main
 
 import "fmt"
 
-// Go imports packages directly; fmt provides printing functions, not the program's entry point.
-// fmt.Println is like C++ std::cout or Python's print() for terminal output.
-// main is the entry point, like C++ main(); Python often uses an if __name__ == "__main__": guard.
-// Unlike Go's required main function, Python's __main__ guard is optional.
 func main() {
-	fmt.Println("Learn golang in such a way so you know how to build softwares in the age of ai era ")
+	fmt.Println("==================================================")
+	fmt.Println("  🚀 Welcome to FastAPI-to-Go Learning Lab!")
+	fmt.Println("==================================================")
+	fmt.Println("To run any lesson, use 'go run ./<folder>':")
+	fmt.Println()
+	fmt.Println("  go run ./01_basics          -> Types, Variables, Scopes & Enums")
+	fmt.Println("  go run ./02_control_flow    -> If/Else Init, Switch, For & Range")
+	fmt.Println("  go run ./03_data_structures -> Slices, Maps & Comma-ok Idiom")
+	fmt.Println()
+	fmt.Println("Cheatsheet reference: CHEATSHEET_BASICS.md")
+	fmt.Println("==================================================")
 }
-
-// Conclusion: package main makes this an executable, main() starts it, and fmt.Println prints text.
