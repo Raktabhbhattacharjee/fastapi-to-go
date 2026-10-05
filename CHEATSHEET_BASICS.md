@@ -1,46 +1,67 @@
-# 📝 Go Basics Cheatsheet
-*(Syntax, Scopes, Control Flow, Slices & Maps)*
+# Go Basics Cheat Sheet: Python to Go
 
----
+A personal reference for a Python developer who is already comfortable with C and C++. It focuses on Go's everyday syntax, static types, collections, and control flow.
 
-## 1. Variables & Types
+## Mental-model shifts
 
-### Three Ways to Declare
+| Python / FastAPI | Go |
+| --- | --- |
+| `str`, `int`, `float`, `bool` | `string`, `int`, `float64`, `bool` |
+| `list[str]` | `[]string` |
+| `dict[str, int]` | `map[string]int` |
+| `None` | `nil` for pointers, slices, maps, and similar reference-like values |
+| Implicit numeric conversion is common | Numeric conversions must be explicit |
+
+## 1. Variables and Types
+
+### Declaring Variables
 ```go
-// 1. Short declaration (inside functions - most common)
+// Go infers the type from the value.
 name := "Rishi"
 port := 8080
 isActive := true
 
-// 2. Explicit type declaration (with 'var')
+// var lets you state the type explicitly.
 var timeout int = 30
 var price float64 = 19.99
 
-// 3. Zero Values (declared without initial value)
-var count int    // Defaults to 0
-var title string // Defaults to "" (empty string)
-var ready bool   // Defaults to false
+// Variables without a value receive the type's zero value.
+var count int    // 0
+var title string // ""
+var ready bool   // false
 ```
 
-### Type Conversions (Must be explicit)
+### Zero Values and `nil`
+```go
+var count int       // 0
+var title string    // ""
+var ready bool      // false
+var tags []string   // nil slice; len(tags) is 0
+var metadata map[string]string // nil map; initialize before writing to it
+
+metadata = make(map[string]string)
+metadata["source"] = "api"
+```
+
+### Converting Types
 ```go
 a := 10
 b := 3.5
 
-// Go does not allow mixing types directly:
+// Go does not combine different numeric types automatically.
 // sum := a + b // ❌ Error!
 
-// Cast explicitly:
+// Convert one value before using it.
 sum := float64(a) + b // 13.5
 intSum := a + int(b)  // 13
 ```
 
-### Constants & Simple Enums (`iota`)
+### Constants and `iota`
 ```go
 const AppName = "MyApp"
 const MaxRetries = 3
 
-// Enums using iota (auto-increments: 0, 1, 2)
+// iota increases automatically within a const block: 0, 1, 2, ...
 const (
     StatusPending = iota // 0
     StatusActive         // 1
@@ -48,102 +69,90 @@ const (
 )
 ```
 
----
+### Operators
 
-## 2. Scopes in Go
+| Purpose | Go operators | Example |
+| --- | --- | --- |
+| Arithmetic | `+`, `-`, `*`, `/`, `%` | `remainder := 10 % 3` |
+| Comparison | `==`, `!=`, `<`, `<=`, `>`, `>=` | `isAdult := age >= 18` |
+| Logic | `&&`, `||`, `!` | `allowed := isAdmin || isOwner` |
+| Assignment | `=`, `+=`, `-=`, `*=`, `/=` | `count += 1` |
 
-Go does not have `public` or `private` keywords. It uses capitalization:
-
-| Rule | Visibility | Example |
-| :--- | :--- | :--- |
-| **Capitalized** | **Public** (Exported to other packages) | `MaxLimit`, `CalculateTotal` |
-| **Lowercase** | **Private** (Only inside current package) | `dbPassword`, `validateUser` |
-
-### Block Scope & Reassignment Trap
-```go
-count := 10
-
-if true {
-    // ⚠️ Trap: ':=' here creates a NEW variable inside this block
-    count := 20
-    fmt.Println(count) // Prints 20
-}
-fmt.Println(count) // Prints 10 (outer variable was untouched!)
-
-// ✅ Correct: use '=' to update the existing variable
-if true {
-    count = 20
-}
-fmt.Println(count) // Prints 20
-```
-
----
-
-## 3. Control Flow
+## 2. Control Flow
 
 ### A. `if / else`
 ```go
-// Standard if / else
+// Standard if / else chain.
+score := 92
+grade := ""
 if score >= 90 {
-    fmt.Println("Grade A")
+    grade = "A"
 } else if score >= 80 {
-    fmt.Println("Grade B")
+    grade = "B"
 } else {
-    fmt.Println("Grade C")
+    grade = "C"
 }
 
-// If with Short Statement (variable only exists inside the if/else block)
+// A short statement can prepare a value for the condition.
+name := "Rishi"
+isLongName := false
 if length := len(name); length > 5 {
-    fmt.Println("Long name:", length)
+    isLongName = true
 }
 ```
 
 ---
 
 ### B. `switch`
-* No `break` needed (Go stops automatically at the end of each case).
+
+Go finishes each case automatically, so `break` is usually unnecessary.
 
 ```go
-// 1. Matching values
+// Match a value.
 role := "admin"
+access := ""
 switch role {
 case "admin":
-    fmt.Println("Full access")
-case "editor", "author": // Match multiple values
-    fmt.Println("Edit access")
+    access = "full"
+case "editor", "author": // Match either value.
+    access = "edit"
 default:
-    fmt.Println("Viewer access")
+    access = "view"
 }
 
-// 2. Tagless switch (alternative to long if/else chains)
-age := 20
+// A tagless switch is useful for a sequence of conditions.
+personAge := 20
+group := ""
 switch {
-case age < 13:
-    fmt.Println("Child")
-case age < 20:
-    fmt.Println("Teen")
+case personAge < 13:
+    group = "child"
+case personAge < 20:
+    group = "teen"
 default:
-    fmt.Println("Adult")
+    group = "adult"
 }
 ```
 
 ---
 
-### C. `for` Loops (Go has no `while`)
+### C. `for` Loops
+
+Go uses `for` for every kind of loop; it has no separate `while` keyword.
 
 ```go
-// 1. Standard loop (like C)
+// Standard three-part loop.
+total := 0
 for i := 0; i < 5; i++ {
-    fmt.Println(i)
+    total += i
 }
 
-// 2. While-style loop
+// Condition-only loop.
 n := 1
 for n < 10 {
     n *= 2
 }
 
-// 3. Infinite loop (use 'break' to stop)
+// Infinite loop; use break to exit it.
 for {
     if shouldStop {
         break
@@ -151,56 +160,56 @@ for {
 }
 ```
 
----
 
-## 4. Slices (Dynamic Lists)
+## 3. Slices
 
-Slices are Go's dynamic lists (like Python lists).
+A slice is a flexible, ordered collection. It is similar to a Python list.
 
 ### Creating Slices
 ```go
-// Direct literal
+// A slice literal.
 fruits := []string{"apple", "banana", "cherry"}
 
-// Using make() with initial length and capacity
+// make creates a slice with length 0 and room for 10 elements.
 numbers := make([]int, 0, 10)
 ```
 
 ### Common Slice Operations
 ```go
-// Append items
+// Add items.
 fruits = append(fruits, "orange")
 fruits = append(fruits, "grape", "mango") // Append multiple
 
-// Length
-fmt.Println(len(fruits)) // Number of elements
+// Number of elements.
+count := len(fruits)
 
-// Slicing (same as Python [start:end])
-sub := fruits[0:2] // First 2 items (indices 0 and 1)
+// Take a range: start is included; end is excluded.
+sub := fruits[0:2] // Elements at indices 0 and 1.
 
-// Loop with index and value
+// Iterate with both index and value.
+positions := make(map[string]int)
 for idx, fruit := range fruits {
-    fmt.Printf("Index %d: %s\n", idx, fruit)
+    positions[fruit] = idx
 }
 
-// Loop values only (ignore index using '_')
+// Ignore the index with _ when only the value matters.
+latestFruit := ""
 for _, fruit := range fruits {
-    fmt.Println(fruit)
+    latestFruit = fruit
 }
 ```
 
----
 
-## 5. Maps (Key-Value Dictionaries)
+## 4. Maps
 
-Maps store key-value pairs (like Python dicts).
+A map stores values under unique keys. It is similar to a Python dictionary.
 
 ### Creating Maps
 ```go
-// Using make()
+// Create an empty map.
 userAges := make(map[string]int)
 
-// Literal map
+// Create a map with initial values.
 scores := map[string]int{
     "alice": 95,
     "bob":   88,
@@ -209,25 +218,27 @@ scores := map[string]int{
 
 ### Common Map Operations
 ```go
-// Set / Update
+// Add or update an entry.
 userAges["rishi"] = 25
 
-// Read
-fmt.Println(userAges["rishi"]) // 25
+// Read a value.
+rishiAge := userAges["rishi"] // 25
 
-// Delete a key
+// Remove an entry.
 delete(userAges, "rishi")
 
-// Check if a key exists (The "Comma-ok" check)
+// The comma-ok form tells you whether a key exists.
 age, exists := userAges["alex"]
+nextAge := 0
 if !exists {
-    fmt.Println("User not found!")
+    age = 0
 } else {
-    fmt.Println("Age is:", age)
+    nextAge = age + 1
 }
 
-// Loop through key and value
+// Iterate through keys and values.
+copiedAges := make(map[string]int)
 for name, age := range userAges {
-    fmt.Printf("%s is %d years old\n", name, age)
+    copiedAges[name] = age
 }
 ```
