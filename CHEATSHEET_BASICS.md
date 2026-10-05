@@ -1,271 +1,233 @@
-# ⚡ Go Foundations & Internals Cheatsheet
-*(Everything before Functions & Structs: Types, Memory, Scopes, Control Flow, Collections & Gotchas)*
+# 📝 Go Basics Cheatsheet
+*(Syntax, Scopes, Control Flow, Slices & Maps)*
 
 ---
 
-## 1. Type System & Memory Primitives
+## 1. Variables & Types
 
-### A. The No-Implicit-Casting Rule (Huge contrast to C & Python)
-In C, `int + float` auto-promotes. In Python, `1 + 2.5` yields `3.5`.
-**In Go, implicit type conversion DOES NOT EXIST.** Every conversion must be explicit:
+### Three Ways to Declare
 ```go
-var a int = 10
-var b float64 = 20.5
-
-// COMPILE ERROR: invalid operation: a + b (mismatched types int and float64)
-// total := a + b 
-
-// CORRECT:
-total := float64(a) + b // 30.5 (type float64)
-intTotal := a + int(b)  // 30   (type int - truncated)
-```
-
-### B. Integer Widths & Platform Specifics
-| Type | Bits | Range | When to Use |
-| :--- | :--- | :--- | :--- |
-| `int` / `uint` | 32 or 64 (arch dependent) | $-2^{63}$ to $2^{63}-1$ on 64-bit | **Default for counts, loop counters, sizes.** |
-| `int8` / `uint8` | 8 bits | -128 to 127 / 0 to 255 | Low-level binary protocols, raw bytes. |
-| `byte` | 8 bits | Alias for `uint8` | Raw I/O data, network buffers, UTF-8 bytes. |
-| `int32` / `rune` | 32 bits | Unicode code point | Processing individual characters (emojis, unicode). |
-| `int64` / `uint64`| 64 bits | Massive numbers / timestamps | Unix timestamps (nanoseconds), DB primary keys. |
-| `uintptr` | Pointer-sized uint | Memory address representation | Unsafe memory operations / syscalls. |
-
----
-
-## 2. Strings, Bytes & Runes Internals (The Python Traps)
-
-In Python, a string is a sequence of characters. **In Go, a string is an immutable, read-only slice of UTF-8 encoded bytes (`[]byte`).**
-
-### A. `len()` Returns BYTES, Not Characters!
-```go
-s1 := "hello"
-fmt.Println(len(s1)) // 5 bytes
-
-s2 := "café"
-fmt.Println(len(s2)) // 5 bytes! ('é' takes 2 bytes in UTF-8: 0xc3, 0xa9)
-
-s3 := "🚀"
-fmt.Println(len(s3)) // 4 bytes!
-```
-
-### B. Indexing `s[i]` Gives Bytes, Not Characters
-```go
-s := "café"
-fmt.Println(s[3])        // Prints 195 (byte 0xc3), NOT 'é'!
-fmt.Printf("%c\n", s[3]) // Prints 'Ã' (broken character)
-```
-
-### C. The Solution: `rune` (Unicode Code Point)
-To iterate characters correctly (including multi-byte UTF-8 & emojis):
-```go
-// Method 1: Range loop over string auto-decodes runes!
-for byteIndex, r := range "café 🚀" {
-    fmt.Printf("Byte pos: %d -> Character: %c\n", byteIndex, r)
-}
-
-// Method 2: Convert to []rune slice
-runes := []rune("café")
-fmt.Println(len(runes))          // 4 (actual character count!)
-fmt.Printf("%c\n", runes[3])     // 'é'
-```
-
-### D. String Mutability & Conversion
-Strings in Go are **100% immutable**. To modify, convert to `[]byte` or `[]rune`:
-```go
-str := "hello"
-// str[0] = 'H' // COMPILE ERROR: cannot assign to str[0]
-
-b := []byte(str)
-b[0] = 'H'
-str = string(b) // "Hello" (Allocates new string memory)
-```
-
----
-
-## 3. Pointers to Primitives (C vs Go)
-
-Unlike C, **Go has NO pointer arithmetic (`p++` is illegal)**, and you cannot have dangling pointers (escape analysis moves variables to the heap if a reference survives).
-
-```go
-count := 42
-
-// 1. Get memory address with '&'
-ptr := &count // Type is *int
-fmt.Println("Address:", ptr) // e.g. 0xc0000180b0
-
-// 2. Dereference with '*' to read or write
-fmt.Println("Value:", *ptr) // 42
-*ptr = 100                  // Modifies 'count' directly in memory
-fmt.Println("Count is now:", count) // 100
-
-// 3. The new() keyword
-p := new(int) // Allocates memory for an int, zeroes it, returns *int
-fmt.Println(*p) // 0
-```
-
----
-
-## 4. Advanced Constants & `iota` (Bitmasks & Enums)
-
-Constants in Go are untyped until assigned, allowing arbitrary-precision math at compile time.
-
-### A. Auto-increment & Skipping with `iota`
-```go
-const (
-    _  = iota             // 0 (discarded using blank identifier)
-    KB = 1 << (10 * iota) // 1 << (10 * 1) = 1024
-    MB = 1 << (10 * iota) // 1 << (10 * 2) = 1048576
-    GB = 1 << (10 * iota) // 1 << (10 * 3) = 1073741824
-)
-```
-
-### B. Bitmask / Permission Flags (Production Pattern)
-```go
-const (
-    ReadPermission    = 1 << iota // 1 (0001)
-    WritePermission               // 2 (0010) - inherits expression!
-    ExecutePermission             // 4 (0100)
-)
-
-userPerms := ReadPermission | WritePermission // 3 (0011)
-hasWrite := (userPerms & WritePermission) != 0 // true
-```
-
----
-
-## 5. Scopes, Shadowing & Package Rules
-
-### A. The 3 Scope Levels
-1. **Package Scope (File-independent):**
-   * Go has **NO file-private scope**. Every file in `package main` sees all package-level variables and constants across all other files in that same folder.
-   * `:=` is **FORBIDDEN** at package scope. Must use `var` or `const`.
-2. **Function Scope:** Variables declared inside a function body.
-3. **Block Scope:** Any curly braces `{ ... }`, including `if`, `for`, `switch`.
-
-### B. The Shadowing Trap in Loops / Blocks
-```go
+// 1. Short declaration (inside functions - most common)
+name := "Rishi"
 port := 8080
-for i := 0; i < 1; i++ {
-    port := 9000 // ⚠️ SHADOWING! Creates a new 'port' in this block.
-    fmt.Println("Inside loop:", port) // 9000
-}
-fmt.Println("Outside loop:", port) // Still 8080!
+isActive := true
 
-// Fix: use '=' to mutate the outer variable:
-port = 9000
+// 2. Explicit type declaration (with 'var')
+var timeout int = 30
+var price float64 = 19.99
+
+// 3. Zero Values (declared without initial value)
+var count int    // Defaults to 0
+var title string // Defaults to "" (empty string)
+var ready bool   // Defaults to false
+```
+
+### Type Conversions (Must be explicit)
+```go
+a := 10
+b := 3.5
+
+// Go does not allow mixing types directly:
+// sum := a + b // ❌ Error!
+
+// Cast explicitly:
+sum := float64(a) + b // 13.5
+intSum := a + int(b)  // 13
+```
+
+### Constants & Simple Enums (`iota`)
+```go
+const AppName = "MyApp"
+const MaxRetries = 3
+
+// Enums using iota (auto-increments: 0, 1, 2)
+const (
+    StatusPending = iota // 0
+    StatusActive         // 1
+    StatusCompleted      // 2
+)
 ```
 
 ---
 
-## 6. Control Flow Mastery: Beyond the Basics
+## 2. Scopes in Go
 
-### A. Labeled `break` and `continue` (Breaking Nested Loops)
-In C or Python, breaking an inner loop requires a boolean flag to escape the outer loop. In Go, use **labels**:
+Go does not have `public` or `private` keywords. It uses capitalization:
+
+| Rule | Visibility | Example |
+| :--- | :--- | :--- |
+| **Capitalized** | **Public** (Exported to other packages) | `MaxLimit`, `CalculateTotal` |
+| **Lowercase** | **Private** (Only inside current package) | `dbPassword`, `validateUser` |
+
+### Block Scope & Reassignment Trap
+```go
+count := 10
+
+if true {
+    // ⚠️ Trap: ':=' here creates a NEW variable inside this block
+    count := 20
+    fmt.Println(count) // Prints 20
+}
+fmt.Println(count) // Prints 10 (outer variable was untouched!)
+
+// ✅ Correct: use '=' to update the existing variable
+if true {
+    count = 20
+}
+fmt.Println(count) // Prints 20
+```
+
+---
+
+## 3. Control Flow
+
+### A. `if / else`
+```go
+// Standard if / else
+if score >= 90 {
+    fmt.Println("Grade A")
+} else if score >= 80 {
+    fmt.Println("Grade B")
+} else {
+    fmt.Println("Grade C")
+}
+
+// If with Short Statement (variable only exists inside the if/else block)
+if length := len(name); length > 5 {
+    fmt.Println("Long name:", length)
+}
+```
+
+---
+
+### B. `switch`
+* No `break` needed (Go stops automatically at the end of each case).
 
 ```go
-OuterLoop:
+// 1. Matching values
+role := "admin"
+switch role {
+case "admin":
+    fmt.Println("Full access")
+case "editor", "author": // Match multiple values
+    fmt.Println("Edit access")
+default:
+    fmt.Println("Viewer access")
+}
+
+// 2. Tagless switch (alternative to long if/else chains)
+age := 20
+switch {
+case age < 13:
+    fmt.Println("Child")
+case age < 20:
+    fmt.Println("Teen")
+default:
+    fmt.Println("Adult")
+}
+```
+
+---
+
+### C. `for` Loops (Go has no `while`)
+
+```go
+// 1. Standard loop (like C)
 for i := 0; i < 5; i++ {
-    for j := 0; j < 5; j++ {
-        if i == 2 && j == 2 {
-            fmt.Println("Breaking out of BOTH loops!")
-            break OuterLoop // Terminates the outer loop directly
-        }
+    fmt.Println(i)
+}
+
+// 2. While-style loop
+n := 1
+for n < 10 {
+    n *= 2
+}
+
+// 3. Infinite loop (use 'break' to stop)
+for {
+    if shouldStop {
+        break
     }
 }
 ```
 
-### B. Switch: `fallthrough` and Type Switching
-By default, Go cases do NOT fall through. Use explicit `fallthrough` if needed:
+---
+
+## 4. Slices (Dynamic Lists)
+
+Slices are Go's dynamic lists (like Python lists).
+
+### Creating Slices
 ```go
-num := 1
-switch num {
-case 1:
-    fmt.Println("One")
-    fallthrough // Forces execution of case 2 without checking its condition!
-case 2:
-    fmt.Println("Two")
+// Direct literal
+fruits := []string{"apple", "banana", "cherry"}
+
+// Using make() with initial length and capacity
+numbers := make([]int, 0, 10)
+```
+
+### Common Slice Operations
+```go
+// Append items
+fruits = append(fruits, "orange")
+fruits = append(fruits, "grape", "mango") // Append multiple
+
+// Length
+fmt.Println(len(fruits)) // Number of elements
+
+// Slicing (same as Python [start:end])
+sub := fruits[0:2] // First 2 items (indices 0 and 1)
+
+// Loop with index and value
+for idx, fruit := range fruits {
+    fmt.Printf("Index %d: %s\n", idx, fruit)
 }
-// Outputs: "One" then "Two"
-```
 
----
-
-## 7. Deep-Dive: Slices & Memory Internals
-
-A slice does NOT hold data itself. It is a 24-byte header (on 64-bit systems) containing:
-1. `Data` pointer $\rightarrow$ points to an underlying array
-2. `Len` $\rightarrow$ number of elements accessed (`len(s)`)
-3. `Cap` $\rightarrow$ maximum capacity before reallocation (`cap(s)`)
-
-### A. Reslicing Shares Memory (The Silent Mutation Gotcha!)
-```go
-original := []int{10, 20, 30, 40}
-sub := original[1:3] // [20, 30]
-
-sub[0] = 999 // ⚠️ Modifies the UNDERLYING array!
-fmt.Println(original) // [10, 999, 30, 40] -> Original was modified!
-```
-
-### B. The Slice Memory Leak Gotcha
-If you slice a tiny piece of a huge array, the garbage collector **cannot free the huge array**:
-```go
-hugeArray := make([]byte, 100_000_000) // 100MB
-sub := hugeArray[:2]                   // 2 bytes, BUT holds reference to all 100MB!
-
-// ⭐️ PRODUCTION FIX: Use copy() to isolate memory:
-subClean := make([]byte, 2)
-copy(subClean, hugeArray[:2]) // Now hugeArray can be garbage collected!
-```
-
-### C. Capacity Growth Strategy
-When `append()` exceeds `cap`, Go allocates a new array (usually $2\times$ up to 256 elements, then $\approx 1.25\times$), copies the data, and discards the old array.
-* **Always pre-allocate if you know the size:** `make([]T, 0, expectedCapacity)`
-
----
-
-## 8. Deep-Dive: Maps Internals & Gotchas
-
-### A. The Nil Map Panic (Crucial Production Gotcha!)
-```go
-var m map[string]int // Declared, but uninitialized (nil)
-
-fmt.Println(m["key"]) // Safe: returns zero-value (0)
-// m["key"] = 100     // 💥 RUNTIME PANIC: assignment to entry in nil map!
-
-// ALWAYS initialize maps before writing:
-m = make(map[string]int)
-m["key"] = 100 // Safe!
-```
-
-### B. Map Iteration is Random by Design!
-In Python 3.7+, dicts preserve insertion order. **In Go, map iteration order is deliberately randomized by the runtime:**
-```go
-m := map[string]int{"a": 1, "b": 2, "c": 3}
-for k := range m {
-    fmt.Print(k, " ") // Order changes across different runs!
+// Loop values only (ignore index using '_')
+for _, fruit := range fruits {
+    fmt.Println(fruit)
 }
-// If you need deterministic order: collect keys into a slice, sort it, and iterate over keys.
-```
-
-### C. Deleting Missing Keys is 100% Safe
-```go
-delete(m, "non-existent-key") // No error, no panic, does nothing safely.
 ```
 
 ---
 
-## 9. Quick Summary Reference Table
+## 5. Maps (Key-Value Dictionaries)
 
-| Concept | The Gotcha / Rule | Production Best Practice |
-| :--- | :--- | :--- |
-| **Type Conversion** | No auto-promotion (`int + float` fails) | Explicit casting: `float64(x) + y` |
-| **Strings** | `len(s)` is byte count, not char count | Use `[]rune(s)` or `for _, r := range s` for UTF-8 |
-| **String Mutation**| Strings are read-only immutable byte slices | Convert to `[]byte`, edit, cast back |
-| **Pointers** | No pointer arithmetic (`p++` is illegal) | Use `*` to dereference, `&` to get address |
-| **Constants** | `iota` auto-increments | Ideal for bitmasks (`1 << iota`) and enums |
-| **Scopes** | All files in a package share package scope | Use `:=` locally; package scope requires `var`/`const` |
-| **Loop Breaking** | Inner `break` only exits inner loop | Use labeled break: `break OuterLoop` |
-| **Slice Sharing** | Sub-slices mutate the parent array | Use `copy()` if data must be independent |
-| **Slice Pre-allocation** | Appending without capacity causes reallocations | `make([]T, 0, capacity)` |
-| **Nil Maps** | Writing to an uninitialized map panics | Always allocate with `make(map[K]V)` |
-| **Map Order** | Iteration order is randomized by the runtime | Sort slice of keys if deterministic order is needed |
+Maps store key-value pairs (like Python dicts).
+
+### Creating Maps
+```go
+// Using make()
+userAges := make(map[string]int)
+
+// Literal map
+scores := map[string]int{
+    "alice": 95,
+    "bob":   88,
+}
+```
+
+### Common Map Operations
+```go
+// Set / Update
+userAges["rishi"] = 25
+
+// Read
+fmt.Println(userAges["rishi"]) // 25
+
+// Delete a key
+delete(userAges, "rishi")
+
+// Check if a key exists (The "Comma-ok" check)
+age, exists := userAges["alex"]
+if !exists {
+    fmt.Println("User not found!")
+} else {
+    fmt.Println("Age is:", age)
+}
+
+// Loop through key and value
+for name, age := range userAges {
+    fmt.Printf("%s is %d years old\n", name, age)
+}
+```
