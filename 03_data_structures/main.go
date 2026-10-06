@@ -14,8 +14,10 @@ func main() {
 	// Fixed size: [3]int is a completely different type from [4]int in Go!
 	var fixedArr [3]int = [3]int{10, 20, 30}
 	fmt.Println("Fixed Array:", fixedArr)
+	arrayLengthDemo()
 
 	fmt.Println("\n--- 2. Slices (Dynamic, 90% of Production Go) ---")
+	slice() // Calls the slice() function from slices.go
 	// Literal slice (no size inside brackets [])
 	numbers := []int{1, 2, 3}
 	fmt.Printf("Slice: %v (len=%d, cap=%d)\n", numbers, len(numbers), cap(numbers))
