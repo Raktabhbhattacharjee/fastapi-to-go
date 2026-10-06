@@ -56,17 +56,10 @@ sum := float64(a) + b // 13.5
 intSum := a + int(b)  // 13
 ```
 
-### Constants and `iota`
+### Constants
 ```go
 const AppName = "MyApp"
 const MaxRetries = 3
-
-// iota increases automatically within a const block: 0, 1, 2, ...
-const (
-    StatusPending = iota // 0
-    StatusActive         // 1
-    StatusCompleted      // 2
-)
 ```
 
 ### Operators
