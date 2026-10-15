@@ -87,3 +87,94 @@ order2 := Order{id: "2"}
 
 order1.status = "paid" // Does NOT affect order2 in any way
 ```
+
+---
+
+### Step 5: Default Zero-Values
+If you omit a field when initializing a struct, Go automatically assigns safe zero-values (no random garbage memory):
+
+| Type | Zero Value |
+| :--- | :--- |
+| `string` | `""` (empty string) |
+| `int`, `float32`, `float64` | `0` or `0.0` |
+| `bool` | `false` |
+| `time.Time` | `0001-01-01 00:00:00 +0000 UTC` (zero-time) |
+| pointer, slice, map | `nil` |
+
+---
+
+### Step 6: The Constructor Pattern (`New...`)
+Go has no `__init__` or `constructor` keyword. Instead, use a factory function named `New<Type>`:
+
+```go
+func NewOrder(id string, amount float32, status string) *Order {
+    return &Order{
+        id:        id,
+        amount:    amount,
+        status:    status,
+        CreatedAt: time.Now(), // automatically set defaults
+    }
+}
+
+// Usage:
+myOrder := NewOrder("ord_1", 29.99, "pending")
+```
+* Why return `*Order`? Returning a pointer avoids copying the struct in memory and allows you to immediately call pointer-receiver methods on it.
+
+---
+
+### Step 7: Anonymous Structs (One-Off Configs / Settings)
+When you only need a struct **once** (like reading database credentials, script flags, or a quick test case), you don't need to define a global `type ... struct`. You can create an **anonymous struct** on the fly:
+
+```go
+// Define fields AND assign values in one expression:
+dbConfig := struct {
+    host string
+    port int
+    user string
+}{
+    host: "localhost",
+    port: 5432,
+    user: "postgres",
+}
+
+fmt.Println(dbConfig.host) // "localhost"
+```
+* **Python equivalent**: Like creating a temporary inline dictionary or one-off Pydantic `BaseSettings` that is only used inside a single initialization function.
+
+---
+
+### Step 8: Nested Structs & Embedding (Composition over Inheritance)
+
+Go does not have classes or `extends`. Instead, it uses composition:
+
+#### 1. Standard Nesting ("Has-A" relationship):
+```go
+type Customer struct {
+    Name  string
+    Email string
+}
+
+type Order struct {
+    ID     string
+    Client Customer // regular nested struct
+}
+
+// Access with chained dots:
+// order.Client.Name
+```
+
+#### 2. Struct Embedding (Automatic Field Promotion):
+```go
+type Order struct {
+    ID string
+    Customer // Notice: NO field name! Just the type name.
+}
+
+// Customer's fields are automatically promoted to Order:
+// order.Name  (Direct access without typing order.Customer.Name!)
+```
+
+
+
+
