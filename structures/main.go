@@ -52,6 +52,35 @@ func NewOrder(id string, amount float32, status string) *Order {
 	}
 }
 
+// ============================================================
+// STEP 11: STRUCT EMBEDDING (Composition over Inheritance)
+// ============================================================
+// Inner struct with its own fields and method:
+type Customer struct {
+	Name  string
+	Email string
+}
+
+func (c Customer) Greet() {
+	fmt.Printf("Default Customer %s says: Hello!\n", c.Name)
+}
+
+// Outer struct embeds Order and Customer (NO field names, just types):
+type SpecialOrder struct {
+	Order    // Embedded: promotes id, amount, status
+	Customer // Embedded: promotes Name, Email, Greet()
+	Discount float32
+}
+
+// ============================================================
+// STEP 12: CUSTOM BEHAVIOR (Method Shadowing)
+// ============================================================
+// If the outer struct defines its OWN method with the same name,
+// it "shadows" (overrides) the inner struct's method:
+func (s SpecialOrder) Greet() {
+	fmt.Printf("VIP Custom Greet: Order for %s with %.0f%% off!\n", s.Name, s.Discount)
+}
+
 func main() {
 	// ============================================================
 	// STEP 4: INSTANTIATE MANUALLY (Struct Literal)
@@ -134,4 +163,40 @@ func main() {
 	}
 
 	fmt.Printf("DB Config (Step 10): %s:%d (User: %s)\n", dbConfig.host, dbConfig.port, dbConfig.user)
+
+	// ============================================================
+	// STEP 11 (In Action): STRUCT EMBEDDING & FIELD PROMOTION
+	// ============================================================
+	special := SpecialOrder{
+		Order: Order{
+			id:     "VIP-999",
+			amount: 499.99,
+			status: "paid",
+		},
+		Customer: Customer{
+			Name:  "Rishi",
+			Email: "rishi@example.com",
+		},
+		Discount: 15.0,
+	}
+
+	// Direct access to promoted fields without nested chaining:
+	fmt.Println("Promoted Order ID:      ", special.id)   // from Order
+	fmt.Println("Promoted Customer Name: ", special.Name) // from Customer
+
+	// ============================================================
+	// STEP 12 (In Action): CUSTOM BEHAVIOR (Method Shadowing)
+	// ============================================================
+	// Calls SpecialOrder's custom Greet() method, NOT Customer's default:
+	special.Greet()
+
+	// If you ever want the inner original method, you can still reach it:
+	special.Customer.Greet()
+
+	// ============================================================
+	// STEP 13: STRICTLY ONE-WAY
+	// ============================================================
+	// 1. Customer has NO IDEA SpecialOrder exists (cannot access .Discount).
+	// 2. SpecialOrder is NOT a Customer in Go's type system!
+	//    To pass to a function expecting Customer, pass `special.Customer`.
 }

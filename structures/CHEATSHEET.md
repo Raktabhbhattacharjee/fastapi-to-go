@@ -175,6 +175,25 @@ type Order struct {
 // order.Name  (Direct access without typing order.Customer.Name!)
 ```
 
+#### 3. Custom Behavior (Method Shadowing / Overriding):
+If the outer struct defines a method with the same name, it shadows the inner method:
+```go
+// Customer's default method:
+func (c Customer) Greet() { fmt.Println("Hello from Customer") }
+
+// Order's custom behavior:
+func (o Order) Greet() { fmt.Println("Hello from Order!") }
+
+// o.Greet()          -> Calls Order's custom Greet
+// o.Customer.Greet() -> Calls Customer's original Greet
+```
+
+#### 4. Strictly One-Way Rules:
+1. **Inner is isolated**: `Customer` has no knowledge of `Order` and cannot access `Order`'s fields.
+2. **No Subtype Polymorphism**: `Order` is **not** a `Customer` in Go's type system. You cannot pass an `Order` to a function expecting `Customer` (must explicitly pass `order.Customer`).
+3. **No Dynamic Dispatch**: If an inner method calls another inner method, it will never dynamically jump to an outer method.
+
+
 
 
 
