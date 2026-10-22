@@ -10,7 +10,7 @@ A comprehensive, production-focused guide to understanding and using interfaces 
 | :--- | :--- | :--- | :--- |
 | **Definition** | `Protocol` / `ABC` | `interface` / pure virtual class | `type Name interface { ... }` |
 | **Implementation** | Implicit (duck typing at runtime) | Explicit: `implements Interface` | **Implicit (duck typing at compile time!)** |
-| **Dependency Injection** | `Depends(get_gateway)` | `@Inject` / Spring container | **Struct holding the interface** |
+| **Dependency Injection** | `Depends(get_gateway)` | `@Inject` / Spring container | **Constructor injection into struct** |
 | **Syntax Keyword** | `class ... (ABC):` | `implements` | **Zero keywords! Just write the method.** |
 
 ---
@@ -24,60 +24,73 @@ A comprehensive, production-focused guide to understanding and using interfaces 
 
 ---
 
-## 3. The 3-Step Production Recipe
+## 3. The 4 Production Pillars of Go Interfaces
 
-### Step 1: Define the Contract (The Interface)
+### Pillar 1: "Accept Interfaces, Return Structs" (The #1 Go Proverb)
+* **When accepting input**: Be as flexible as possible $\rightarrow$ accept an `interface`.
+* **When returning output**: Be as concrete as possible $\rightarrow$ return a concrete `*struct`.
 ```go
-type Payer interface {
-    Pay(amount float32)
+// Takes flexible interface, returns concrete struct:
+func NewPaymentService(gateway Payer) *PaymentService {
+    return &PaymentService{gateway: gateway}
 }
 ```
 
-### Step 2: Accept the Interface in your Service
+### Pillar 2: "Define Interfaces Where They Are Used" (Consumer, not Producer)
+* In Java/C#, the library creating Razorpay also creates `IRazorpay`.
+* In **Go**, the **caller (consumer)** defines the interface!
+* `PaymentService` is the consumer that needs to make payments, so `PaymentService` defines `type Payer interface`. `Razorpay` doesn't need to know or care about `Payer`!
+
+### Pillar 3: "Keep Interfaces Tiny" (1–2 Methods Max)
+* The smaller the interface, the more powerful and reusable it is.
+* Standard library examples:
+  * `io.Reader`: 1 method (`Read`)
+  * `io.Writer`: 1 method (`Write`)
+  * `fmt.Stringer`: 1 method (`String`)
+* If an interface has 10 methods, it becomes painful to swap or mock.
+
+### Pillar 4: "Inject Via Constructor"
+* Instead of creating dependencies secretly inside methods, pass them in through a `New...` factory function:
 ```go
-type PaymentService struct {
-    gateway Payer // 👈 Holds ANY struct that satisfies Payer
-}
-
-func (p PaymentService) MakePayment(amount float32) {
-    p.gateway.Pay(amount)
-}
-```
-
-### Step 3: Implement the Structs (Providers)
-```go
-type Razorpay struct{}
-func (r Razorpay) Pay(amount float32) {
-    fmt.Println("Paying via Razorpay:", amount)
-}
-
-type Stripe struct{}
-func (s Stripe) Pay(amount float32) {
-    fmt.Println("Paying via Stripe:", amount)
-}
-```
-
-### Step 4: Inject in `main()`
-```go
-func main() {
-    service := PaymentService{gateway: Razorpay{}}
-    service.MakePayment(100)
-
-    // Swap to Stripe with ZERO changes to PaymentService:
-    service = PaymentService{gateway: Stripe{}}
-    service.MakePayment(200)
-}
+razorpay := NewRazorpay()
+paymentService := NewPaymentService(razorpay) // Injected cleanly!
 ```
 
 ---
 
 ## 4. Production Patterns
 
-### Pattern 1: Unit Testing with Mocks (Test without Real APIs or DBs)
-In production, you never charge real credit cards or hit production databases during tests. Interfaces make testing effortless:
+### Pattern 1: Swappable Infrastructure (The Repository Pattern)
+Swap databases (Postgres, Mongo, In-Memory) without changing business logic:
 
 ```go
-// Fake mock gateway for tests
+// 1. Contract defined by the consumer:
+type UserRepository interface {
+    SaveUser(user User) error
+    GetUser(id string) (User, error)
+}
+
+// 2. Business logic only depends on the interface:
+type UserService struct {
+    repo UserRepository
+}
+
+func NewUserService(r UserRepository) *UserService {
+    return &UserService{repo: r}
+}
+
+// 3. Swap in main() based on environment:
+// db := PostgresRepo{}  // in Production
+// db := InMemoryRepo{}  // in Local/Test
+// service := NewUserService(db)
+```
+
+---
+
+### Pattern 2: Unit Testing with Mocks (Test without Real APIs or DBs)
+In production, you never charge real credit cards or hit production databases during tests:
+
+```go
 type MockPaymentGateway struct {
     WasCalled bool
 }
@@ -89,7 +102,7 @@ func (m *MockPaymentGateway) Pay(amount float32) {
 // In test file:
 func TestPaymentFlow(t *testing.T) {
     mock := &MockPaymentGateway{}
-    service := PaymentService{gateway: mock}
+    service := NewPaymentService(mock)
 
     service.MakePayment(50)
 
@@ -101,22 +114,7 @@ func TestPaymentFlow(t *testing.T) {
 
 ---
 
-### Pattern 2: "Accept Interfaces, Return Structs" (The #1 Go Proverb)
-* **When accepting input**: Be as flexible as possible (accept an `interface`).
-* **When returning output**: Be as concrete and specific as possible (return a concrete `struct` or pointer to `struct`).
-
-```go
-// Good Go practice:
-func ProcessPayment(p Payer) { ... } // Accepts ANY Payer
-
-func NewRazorpay() *Razorpay { ... }  // Returns concrete *Razorpay
-```
-
----
-
 ### Pattern 3: Standard Library Interfaces (Everywhere in Go)
-
-Go’s standard library is built on simple 1-method interfaces:
 
 1. **`fmt.Stringer`** (Like Python's `__str__`):
    ```go
@@ -124,7 +122,7 @@ Go’s standard library is built on simple 1-method interfaces:
        String() string
    }
    ```
-   If your struct has a `.String() string` method, `fmt.Println(myStruct)` will automatically print your custom string!
+   If your struct has a `.String() string` method, `fmt.Println(myStruct)` will automatically print your custom formatted string!
 
 2. **`io.Reader`** and **`io.Writer`**:
    Used for files, network sockets, HTTP request bodies, and buffers. Anything with `Read()` can be processed by anything that takes an `io.Reader`.
@@ -135,7 +133,8 @@ Go’s standard library is built on simple 1-method interfaces:
 
 | What to do | Go Code |
 | :--- | :--- |
-| **Define interface** | `type Notifier interface { Send(msg string) }` |
-| **Implement interface** | Simply attach `func (s SMS) Send(msg string) { ... }` |
-| **Inject dependency** | `type Service struct { n Notifier }` |
-| **Check compliance** | Go compiler checks it automatically at compile-time! |
+| **Accept interfaces** | Functions & constructors take interfaces (`gateway Payer`) |
+| **Return structs** | Constructors return concrete pointers (`*PaymentService`) |
+| **Define where used** | The package that *needs* the tool defines the interface |
+| **Keep it tiny** | 1 or 2 methods per interface (e.g. `Payer`) |
+| **Constructor injection** | `NewService(tool Tool) *Service` |
