@@ -7,54 +7,64 @@ import (
 )
 
 // Simulation: An Image Processing Service
-// It takes an image URL, simulates a heavy task (resizing/compressing),
-// prints when done, and notifies the WaitGroup.
+// It takes an image URL, compresses it in the background,
+// notifies the WaitGroup when done, and sends the finished result into the Channel!
+func worker(url string, wg *sync.WaitGroup, ch chan string) {
+	defer wg.Done() // 1. Always decrement counter right before exiting
 
-func worker(url string, wg *sync.WaitGroup) string {
-	defer wg.Done()
-	time.Sleep(time.Millisecond * 60)
+	time.Sleep(time.Millisecond * 60) // Simulating 60ms image compression
 	fmt.Println("image processed ", url)
-	// wg.Done() // Decrements counter: counter = counter - 1
-	return url
+
+	// 2. Safely push the finished result into the Channel (Arrow points INTO ch)
+	ch <- "PROCESSED: " + url
 }
 
 func main() {
-	// Declare a WaitGroup from the 'sync' package to track active background workers
+	// 1. Declare WaitGroup to track active background workers
 	var wg sync.WaitGroup
 
-	// Start a timer to measure how long the concurrent execution takes
+	// 2. Create a Buffered Channel (Capacity = 2 slots for our 2 images)
+	// A buffered channel acts as an in-memory FIFO drop-box
+	resultCHan := make(chan string, 2)
+
+	// Start a timer to measure total concurrent execution time
 	startime := time.Now()
 
-	// 1. Tell WaitGroup we have 2 background jobs to wait for (Counter = 2)
+	// 3. Set WaitGroup counter to 2 (Waiting for 2 background workers)
 	wg.Add(2)
 
-	// 2. Launch both workers concurrently (Pass &wg as a pointer so state is shared)
-	go worker("image_12.png", &wg)
-	go worker("image_13.png", &wg)
+	// 4. Launch both workers concurrently!
+	// Pass &wg as a pointer (shared counter) and resultCHan as the delivery pipe
+	go worker("image_12.png", &wg, resultCHan)
+	go worker("image_13.png", &wg, resultCHan)
 
-	// Note: Goroutine return values are ignored by Go.
-	// (To send values back to main, we use Go Channels).
-	// fmt.Println("result", result)
-	// fmt.Println("result1", result1)
+	// 5. Meanwhile, main() could do other tasks here if needed!
+	// fmt.Println("Main is doing other tasks while images compress...")
 
-	// 3. WaitGroup maintains an internal counter:
-	// wg.Wait() pauses main() here until the counter drops back down to 0
+	// 6. Wait for both background workers to finish their jobs (Counter reaches 0)
 	wg.Wait()
 
-	fmt.Printf("it took %s\n", time.Since(startime))
+	// 7. Pull the finished results out of the Channel (Arrow points OUT of channel)
+	res1 := <-resultCHan
+	res2 := <-resultCHan
+
+	fmt.Println("\n--- FINAL RESULTS RECEIVED IN MAIN ---")
+	fmt.Println("Result 1:", res1)
+	fmt.Println("Result 2:", res2)
+
+	fmt.Printf("\nit took %s\n", time.Since(startime))
 }
 
 // -----------------------------------------------------------------------------
-// CORE TAKEAWAYS & COMPARISON WITH SEQUENTIAL CODE:
+// CORE ARCHITECTURAL TAKEAWAYS:
 // -----------------------------------------------------------------------------
-// 1. Sequential execution (Standard C/C++ style without threads):
-//    main() would call task 1 -> wait 60ms -> call task 2 -> wait 60ms.
-//    Total time would be: 60ms + 60ms = 120ms.
+// 1. sync.WaitGroup is the ALARM CLOCK:
+//    It tells main() WHEN all background tasks are done so the program doesn't exit early.
 //
-// 2. Go concurrent execution with 'go':
-//    main() spawns both workers in the background and moves to the next line immediately.
-//    Without a wait mechanism, main() would exit in 0.001ms before workers could finish!
+// 2. The Channel is the SECURE DELIVERY PIPE:
+//    It is a thread-safe FIFO queue that transports the data from background
+//    workers back to main() with zero race conditions!
 //
-// 3. Why we use sync.WaitGroup:
-//    It acts as a synchronized barrier holding the door open until all workers
-//    signal completion via wg.Done(). Both tasks run in parallel in ~60ms total.
+// 3. True Parallelism:
+//    Both 60ms image tasks ran simultaneously on separate CPU cores,
+//    completing in ~60ms total instead of 120ms sequential time!
